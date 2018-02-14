@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -5,13 +6,36 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchtext as tt
 
+def l2norm(x):
+    norm = x.norm(p=2, dim=1, keepdim=True)
+    return x.div(norm.expand_as(x))
+
+def argmax(x):
+    return x.max(1)[1]
+
 TEXT = tt.data.ReversibleField(sequential=True, tokenize= lambda x: x.split(), lower=True)
 LABEL = tt.data.Field(sequential=False, use_vocab=False)
 
-TEXT.build_vocab([["king","alpha","queen","beta","man","gamma","woman","delta"]], vectors="glove.6B.100d")
-a, b, c, d = TEXT.vocab.vectors[2:6]
+# Lookup words in GloVe, then find the most similar other word
+words = ["king","alpha","queen","beta","man","gamma","woman","delta", "run", "walk"]
+idx2word = {idx: word for idx, word in enumerate(words)}
+TEXT.build_vocab([words], vectors="glove.6B.100d")
+k, a, q, b, m, g, w, d = TEXT.vocab.vectors[2:10]
 
-import revtok
+# https://stackoverflow.com/questions/37558899/efficiently-finding-closest-word-in-tensorflow-embedding
+embedding = TEXT.vocab.vectors[2:]
+
+batch_array = torch.stack([w, d])
+normed_embedding = l2norm(embedding)
+normed_array = l2norm(batch_array)
+
+cosine_similarity = torch.matmul(normed_array, torch.transpose(normed_embedding, 1, 0))
+closest_words = np.argsort(cosine_similarity)[:,-2]
+print([idx2word[word] for word in closest_words])
+
+
+
+#import revtok
 
 vocab_tensor = torch.Tensor(TEXT.vocab.vectors[2:6])
 
