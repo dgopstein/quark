@@ -9,14 +9,28 @@ import gensim.models.doc2vec
 import multiprocessing
 from collections import namedtuple
 from find_files import filetypes_in_dirs
+import re
+
+def tokenize_source(s):
+    return re.findall(re.compile(token_pat + '|(?:(?!' + token_pat + ').)+'), s)
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags')
 
 alldocs = []
 doc_idx = 0
-for filename in filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"]):
+
+java_files = filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
+
+# file_content = "alpha.bravo(charlie,delta); echo + foxtrot;\n\ngolf;"
+# print('|'.join(tokenize_source(file_content)[-50:]))
+# >>> alpha|.|bravo|(|charlie|,|delta|)|;| |echo| |+| |foxtrot|;|golf|;
+
+# with open('/home/dgopstein/opt/src/tomcat85/webapps/examples/jsp/plugin/applet/Clock2.java', 'r') as file_obj:
+#     print(tokenize_source(file_obj.read())[-50:])
+
+for filename in java_files:
     with open(filename, 'r') as file_obj:
-        file_content = file_obj.read()
+        file_content = tokenize_source(file_obj.read())
         split = ['train', 'test', 'validate', 'extra'][doc_idx % 4]
         tags = [filename]
         doc_idx += 1
@@ -37,8 +51,6 @@ assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow oth
 pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=100, window=10, negative=5, hs=0, min_count=2, workers=cores)
 
 pv_dm.build_vocab(alldocs)
-
-models_by_name = {"PV-DM": pv_dm}
 
 ###################################################
 # Evaluate the models
@@ -100,11 +112,10 @@ best_error = defaultdict(lambda: 1.0)  # To selectively print only best errors a
 from random import shuffle
 import datetime
 
-alpha, min_alpha, passes = (0.025, 0.001, 20)
+alpha, min_alpha, passes = (0.025, 0.001, 200)
 alpha_delta = (alpha - min_alpha) / passes
 
-print("START %s" % datetime.datetime.now())
-
+start_time = datetime.datetime.now()
 for epoch in range(passes):
     shuffle(doc_list)  # Shuffling gets best results
 
@@ -140,9 +151,8 @@ for epoch in range(passes):
     print('Completed pass %i at alpha %f' % (epoch + 1, alpha))
     alpha -= alpha_delta
 
-print("END %s" % str(datetime.datetime.now()))
+end_time = datetime.datetime.now()
+print("DURATION %s" % (end_time-start_time))
 
-pv_dm.most_similar("f")
-pv_dm.wv.vocab
-
-[d.tags for d in alldocs[:10]]
+pv_dm.most_similar(".")
+list(pv_dm.wv.vocab.keys())[:100]
