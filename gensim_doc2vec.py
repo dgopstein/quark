@@ -16,7 +16,6 @@ def tokenize_source(s):
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags')
 
-alldocs = []
 doc_idx = 0
 
 java_files = filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
@@ -28,27 +27,32 @@ java_files = filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
 # with open('/home/dgopstein/opt/src/tomcat85/webapps/examples/jsp/plugin/applet/Clock2.java', 'r') as file_obj:
 #     print(tokenize_source(file_obj.read())[-50:])
 
-for filename in java_files:
-    with open(filename, 'r') as file_obj:
-        file_content = tokenize_source(file_obj.read())
-        split = ['train', 'test', 'validate', 'extra'][doc_idx % 4]
-        tags = [filename]
-        doc_idx += 1
-        alldocs.append(CodeDocument(file_content, split, tags))
+def load_docs():
+    alldocs = []
+    for filename in java_files:
+        with open(filename, 'r') as file_obj:
+            file_content = tokenize_source(file_obj.read())
+            split = ['train', 'test', 'validate', 'extra'][doc_idx % 4]
+            tags = [filename]
+            doc_idx += 1
+            alldocs.append(CodeDocument(file_content, split, tags))
 
-train_docs = [doc for doc in alldocs if doc.split == 'train']
-test_docs = [doc for doc in alldocs if doc.split == 'test']
+    train_docs = [doc for doc in alldocs if doc.split == 'train']
+    test_docs = [doc for doc in alldocs if doc.split == 'test']
+
+    return (alldocs, train_docs, test_docs)
+
+alldocs, train_docs, test_docs = load_docs()
 doc_list = alldocs[:]  # For reshuffling per pass
 
 ###################################################
 # Create the models
 ###################################################
 
-cores = multiprocessing.cpu_count()
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
 
 # PV-DM w/ average - alternatives include using dm_concat and using PV-DBOW
-pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=100, window=10, negative=5, hs=0, min_count=2, workers=cores)
+pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=100, window=10, negative=5, hs=0, min_count=2, workers=multiprocessing.cpu_count())
 
 pv_dm.build_vocab(alldocs)
 
@@ -112,7 +116,7 @@ best_error = defaultdict(lambda: 1.0)  # To selectively print only best errors a
 from random import shuffle
 import datetime
 
-alpha, min_alpha, passes = (0.025, 0.001, 200)
+alpha, min_alpha, passes = (0.005, 0.0001, 3000)
 alpha_delta = (alpha - min_alpha) / passes
 
 start_time = datetime.datetime.now()
@@ -154,5 +158,5 @@ for epoch in range(passes):
 end_time = datetime.datetime.now()
 print("DURATION %s" % (end_time-start_time))
 
-pv_dm.most_similar(".")
+pv_dm.most_similar("getValue")
 list(pv_dm.wv.vocab.keys())[:100]
