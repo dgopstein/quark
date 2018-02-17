@@ -94,12 +94,12 @@ def error_rate_for_model(test_model, train_set, test_set, infer=False, infer_ste
     """Report error rate on test_doc sentiments, using supplied model and train_docs"""
 
     train_targets, train_regressors = zip(*[(doc.directory, test_model.docvecs[doc.tags[0]]) for doc in train_set])
-    train_regressors = sm.add_constant(train_regressors)
+    #train_regressors = sm.add_constant(train_regressors)
     train_targets[0]
 
     with elapsed_timer() as elapsed:
         predictor = logistic_predictor_from_data(train_targets, train_regressors)
-        print("elapsed time", elapsed())
+        #print("elapsed time", elapsed())
 
     test_data = test_set
     if infer:
@@ -114,7 +114,7 @@ def error_rate_for_model(test_model, train_set, test_set, infer=False, infer_ste
     test_regressors[0]
     with elapsed_timer() as elapsed:
         test_predictions = predictor.predict(test_regressors)
-        print("elapsed time", elapsed())
+        #print("elapsed time", elapsed())
     predictor
     [doc.directory for doc in test_data]
     predicted_classes = [classes[x] for x in np.argmax(test_predictions, axis=1)]
@@ -134,9 +134,10 @@ from random import shuffle
 import datetime
 
 def train_pvdm():
-    alpha, min_alpha, passes = (0.025, 0.001, 20)
+    alpha, min_alpha, passes = (0.025, 0.001, 200)
     alpha_delta = (alpha - min_alpha) / passes
     best_error = defaultdict(lambda: 1.0)  # To selectively print only best errors achieved
+    name = "pvdm"
 
     start_time = datetime.datetime.now()
     for epoch in range(passes):
@@ -171,7 +172,7 @@ def train_pvdm():
                 best_indicator = '*'
             print("%s%f : %i passes : %s %ss %ss" % (best_indicator, infer_err, epoch + 1, name + '_inferred', duration, eval_duration))
 
-        print('Completed pass %i at alpha %f' % (epoch + 1, alpha))
+        #print('Completed pass %i at alpha %f' % (epoch + 1, alpha))
         alpha -= alpha_delta
 
     end_time = datetime.datetime.now()
