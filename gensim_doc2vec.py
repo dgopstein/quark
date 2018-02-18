@@ -1,8 +1,16 @@
 # https://github.com/RaRe-Technologies/gensim/blob/develop/docs/notebooks/doc2vec-IMDB.ipynb
 
-hyper_params = {'vector_size': 100,
-                'min_count': 5,
-                'passes': 3}
+hyper_params = {'dataset': 'linux',
+                'vector_size': 100,
+                'min_count': 1000,
+                'alpha_start': 0.1,
+                'alpha_stop': 0.001,
+                'passes': 5}
+
+datasets = {
+    'linux': lambda: c_files_in_dirs(["~/opt/src/linux"]),
+    'tomcat': lambda: filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
+}
 
 ###################################################
 # Read the corpus
@@ -33,8 +41,7 @@ CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
 #     print(tokenize_source(file_obj.read())[-50:])
 
 def load_docs():
-    #files = filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
-    files = c_files_in_dirs(["~/opt/src/linux"])
+    files = datasets[hyper_params['dataset']]()
     doc_idx = 0
     alldocs = []
     #[x for x in files if re.match(r'.*/linux/.*/linux/', x)][:3]
@@ -166,7 +173,7 @@ def train_pvdm():
         all_errors[name].append(err)
         print("%s%f : %i passes : %s %ss %ss" % (best_indicator, err, epoch + 1, name, duration, eval_duration))
 
-    alpha, min_alpha, passes = (0.1, 0.001, hyper_params['passes'])
+    alpha, min_alpha, passes = (hyper_params['alpha_start'], hyper_params['alpha_stop'], hyper_params['passes'])
     alpha_delta = (alpha - min_alpha) / passes
     best_error = defaultdict(lambda: 1.0)  # To selectively print only best errors achieved
     all_errors = defaultdict(lambda: [])  # To selectively print only best errors achieved
@@ -194,13 +201,23 @@ def train_pvdm():
         alpha -= alpha_delta
 
     end_time = datetime.datetime.now()
+
+
+    with open('tmp/%s_%s'%(hyper_params['dataset'], start_time), 'a') as f:
+        print({'hyper_params': hyper_params,
+            'start_time': start_time,
+            'end_time': end_time,
+            'duration': end_time-start_time,
+            'all_errors': all_errors}, file=f)
+
     print("all_errors: ", all_errors)
     print("DURATION %s" % (end_time-start_time))
 
+print(hyper_params)
 train_pvdm()
 
-pv_dm.most_similar("protected")
-pv_dm.wv.most_similar(positive=['boolean', 'int'], negative=['Integer'])
+pv_dm.most_similar("<")
+pv_dm.wv.most_similar(positive=['true', 'false'], negative=['bool'])
 len(pv_dm.wv.vocab.keys())
 
 #import gnuplotlib as gp
