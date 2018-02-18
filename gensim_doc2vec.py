@@ -1,5 +1,9 @@
 # https://github.com/RaRe-Technologies/gensim/blob/develop/docs/notebooks/doc2vec-IMDB.ipynb
 
+hyper_params = {'vector_size': 100,
+                'min_count': 5,
+                'passes': 3}
+
 ###################################################
 # Read the corpus
 ###################################################
@@ -16,7 +20,7 @@ from scipy import stats
 stats.chisqprob = lambda chisq, df: stats.chi2.sf(chisq, df)
 
 def tokenize_source(s):
-    token_pat = '(?:[][.,;{}()|+=*&^%!~-]|\\.|(?: +))'
+    token_pat = '(?:[][.,;{}()|+=*&^%!~-]|(?:\s+))'
     return re.findall(re.compile(token_pat + '|(?:(?!' + token_pat + ').)+'), s)
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
@@ -58,7 +62,6 @@ alldocs, train_docs, test_docs = load_docs()
 doc_list = alldocs[:]  # For reshuffling per pass
 
 id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
-
 ###################################################
 # Create the models
 ###################################################
@@ -66,7 +69,7 @@ id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
 
 # PV-DM w/ average - alternatives include using dm_concat and using PV-DBOW
-pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=100, window=10, negative=5, hs=0, min_count=2, workers=multiprocessing.cpu_count())
+pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=10, negative=5, hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
 
 pv_dm.build_vocab(alldocs)
 
@@ -129,10 +132,14 @@ def error_rate_for_model(test_model, train_set, test_set, infer=False, infer_ste
     #predictor
     #[doc.directory for doc in test_data]
     predicted_classes = [id2class[x] for x in np.argmax(test_predictions, axis=1)]
-    correct_classes = [x == y for (x, y) in zip(predicted_classes, [doc.directory for doc in test_data])]
-    corrects = Counter(correct_classes)[True]
-    errors = len(test_predictions) - corrects
-    error_rate = float(errors) / len(test_predictions)
+    correct_classes = [doc.directory for doc in test_data]
+    matched_classes = list(zip(predicted_classes, correct_classes))
+    matched_classes[1000:1010]
+    correct_matches  = [x == y for (x, y) in matched_classes]
+    correct_counts = Counter(correct_matches)
+    corrects = correct_counts[True]
+    errors = correct_counts[False]
+    error_rate = float(errors) / (corrects + errors)
     return (error_rate, errors, len(test_predictions), predictor)
 
 ###################################################
@@ -145,11 +152,12 @@ from collections import defaultdict
 from random import shuffle
 import datetime
 
+infer = False
 def train_pvdm():
     def eval_error(name, infer):
         eval_duration = ''
         with elapsed_timer() as eval_elapsed:
-            err, err_count, test_count, predictor = error_rate_for_model(pv_dm, train_docs[::100], test_docs[::100], infer=infer)
+            err, err_count, test_count, predictor = error_rate_for_model(pv_dm, train_docs, test_docs, infer=infer)
             eval_duration = '%.1f' % eval_elapsed()
         best_indicator = ' '
         if err < best_error[name]:
@@ -158,7 +166,7 @@ def train_pvdm():
         all_errors[name].append(err)
         print("%s%f : %i passes : %s %ss %ss" % (best_indicator, err, epoch + 1, name, duration, eval_duration))
 
-    alpha, min_alpha, passes = (0.1, 0.001, 500)
+    alpha, min_alpha, passes = (0.1, 0.001, hyper_params['passes'])
     alpha_delta = (alpha - min_alpha) / passes
     best_error = defaultdict(lambda: 1.0)  # To selectively print only best errors achieved
     all_errors = defaultdict(lambda: [])  # To selectively print only best errors achieved
@@ -193,7 +201,7 @@ train_pvdm()
 
 pv_dm.most_similar("protected")
 pv_dm.wv.most_similar(positive=['boolean', 'int'], negative=['Integer'])
-list(pv_dm.wv.vocab.keys())[:100]
+len(pv_dm.wv.vocab.keys())
 
 #import gnuplotlib as gp
 #gp.plot( [1, 2, 3, 2, 1] )
