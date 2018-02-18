@@ -161,6 +161,7 @@ import datetime
 
 infer = False
 def train_pvdm():
+    print("training pvdm with: ", hyper_params)
     def eval_error(name, infer):
         eval_duration = ''
         with elapsed_timer() as eval_elapsed:
@@ -205,15 +206,14 @@ def train_pvdm():
 
     with open('tmp/%s_%s'%(hyper_params['dataset'], start_time), 'a') as f:
         print({'hyper_params': hyper_params,
-            'start_time': start_time,
-            'end_time': end_time,
-            'duration': end_time-start_time,
-            'all_errors': all_errors}, file=f)
+               'start_time': start_time,
+               'end_time': end_time,
+               'duration': end_time-start_time,
+               'best_error': dict(best_error),
+               'all_errors': dict(all_errors)}, file=f)
 
-    print("all_errors: ", all_errors)
     print("DURATION %s" % (end_time-start_time))
 
-print(hyper_params)
 train_pvdm()
 
 pv_dm.most_similar("<")
