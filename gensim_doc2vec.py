@@ -1,15 +1,49 @@
 # https://github.com/RaRe-Technologies/gensim/blob/develop/docs/notebooks/doc2vec-IMDB.ipynb
 
-hyper_params = {'dataset': 'linux',
-                'vector_size': 100,
-                'min_count': 1000,
-                'alpha_start': 0.1,
-                'alpha_stop': 0.001,
-                'passes': 5}
+best_linux_hyper_params = {
+    'dataset': 'linux',
+    'test_split': 4,
+    'vector_size': 100,
+    'window': 10,
+    'negative_samples': 5,
+    'min_count': 1000,
+    'alpha_start': 0.1,
+    'alpha_stop': 0.001,
+    'passes': 5}
+
+best_nginx_hyper_params = {
+    'dataset': 'nginx',
+    'test_split': 4,
+    'vector_size': 100,
+    'window': 10,
+    'negative_samples': 5,
+    'min_count': 5,
+    'alpha_start': 0.01,
+    'alpha_stop': 0.001,
+    'passes': 20}
+
+best_mongo_hyper_params = {
+    'dataset': 'nginx',
+    'test_split': 4,
+    'vector_size': 100,
+    'window': 10,
+    'negative_samples': 5,
+    'min_count': 5,
+    'alpha_start': 0.01,
+    'alpha_stop': 0.001,
+    'passes': 5}
+
+hyper_params = best_mongo_hyper_params
 
 datasets = {
-    'linux': lambda: c_files_in_dirs(["~/opt/src/linux"]),
-    'tomcat': lambda: filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"])
+    'linux': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/linux"]),
+              'module_matcher': r'.*?/linux/([^/]*).*'},
+    'mongo': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/mongo/src/mongo"]),
+              'module_matcher': r'.*?/mongo/src/mongo/([^/]*).*'},
+    'nginx': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/nginx"]),
+              'module_matcher': r'.*?/nginx/src/([^/]*).*'},
+    'tomcat':{'file_finder': lambda: filetypes_in_dirs(["java"], ["~/opt/src/tomcat85"]),
+              'module_matcher': r'.*tomcat85/([^/]*(?:/[^/]*)?).*'}
 }
 
 ###################################################
@@ -41,7 +75,8 @@ CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
 #     print(tokenize_source(file_obj.read())[-50:])
 
 def load_docs():
-    files = datasets[hyper_params['dataset']]()
+    files = datasets[hyper_params['dataset']]['file_finder']()
+    files[0]
     doc_idx = 0
     alldocs = []
     #[x for x in files if re.match(r'.*/linux/.*/linux/', x)][:3]
@@ -50,11 +85,9 @@ def load_docs():
             try:
                 file_content = tokenize_source(file_obj.read())
                 #split = ['train', 'test', 'validate', 'extra'][doc_idx % 4]
-                split = ['train', 'train', 'train', 'test'][doc_idx % 4]
+                split = ['test', 'train'][doc_idx % hyper_params['test_split'] == 0]
                 tags = [filename]
-                #directory = re.match(r'.*(tomcat85/.*/)[^/]*', filename).group(1)
-                #directory = re.match(r'.*tomcat85/([^/]*(?:/[^/]*)?).*', filename).group(1)
-                directory = re.match(r'.*?/linux/([^/]*).*', filename).group(1)
+                directory = re.match(datasets[hyper_params['dataset']]['module_matcher'], filename).group(1)
                 doc_idx += 1
                 alldocs.append(CodeDocument(file_content, split, tags, directory))
             except:
@@ -69,6 +102,7 @@ alldocs, train_docs, test_docs = load_docs()
 doc_list = alldocs[:]  # For reshuffling per pass
 
 id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
+len(id2class)
 ###################################################
 # Create the models
 ###################################################
@@ -76,7 +110,7 @@ id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
 
 # PV-DM w/ average - alternatives include using dm_concat and using PV-DBOW
-pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=10, negative=5, hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
+pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=hyper_params['window'], negative=hyper_params['negative_samples'], hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
 
 pv_dm.build_vocab(alldocs)
 
@@ -212,12 +246,13 @@ def train_pvdm():
                'best_error': dict(best_error),
                'all_errors': dict(all_errors)}, file=f)
 
-    print("DURATION %s" % (end_time-start_time))
+    print("Best error: ", dict(best_error))
+    print("Duration %s" % (end_time-start_time))
 
 train_pvdm()
 
-pv_dm.most_similar("<")
-pv_dm.wv.most_similar(positive=['true', 'false'], negative=['bool'])
+pv_dm.most_similar("int")
+pv_dm.wv.most_similar(positive=['int', 'int'], negative=['0'])
 len(pv_dm.wv.vocab.keys())
 
 #import gnuplotlib as gp
