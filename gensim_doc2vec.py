@@ -33,7 +33,7 @@ best_mongo_hyper_params = {
     'alpha_stop': 0.001,
     'passes': 5}
 
-hyper_params = best_mongo_hyper_params
+hyper_params = best_linux_hyper_params
 
 datasets = {
     'linux': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/linux"]),
@@ -50,11 +50,13 @@ datasets = {
 # Read the corpus
 ###################################################
 
+import json
 from gensim.models import Doc2Vec
 import gensim.models.doc2vec
 import multiprocessing
 from collections import namedtuple, Counter
 from find_files import filetypes_in_dirs, c_files_in_dirs
+from datetime_json import *
 import re
 
 # https://github.com/statsmodels/statsmodels/issues/3931
@@ -67,16 +69,8 @@ def tokenize_source(s):
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
 
-# file_content = "alpha.bravo(charlie,delta); echo + foxtrot;\n\ngolf;"
-# print('|'.join(tokenize_source(file_content)[-50:]))
-# >>> alpha|.|bravo|(|charlie|,|delta|)|;| |echo| |+| |foxtrot|;|golf|;
-
-# with open('/home/dgopstein/opt/src/tomcat85/webapps/examples/jsp/plugin/applet/Clock2.java', 'r') as file_obj:
-#     print(tokenize_source(file_obj.read())[-50:])
-
 def load_docs():
     files = datasets[hyper_params['dataset']]['file_finder']()
-    files[0]
     doc_idx = 0
     alldocs = []
     #[x for x in files if re.match(r'.*/linux/.*/linux/', x)][:3]
@@ -92,6 +86,11 @@ def load_docs():
                 alldocs.append(CodeDocument(file_content, split, tags, directory))
             except:
                 pass
+
+    # Linux filter out uncommon modules
+    # valid_dirs = set({k:v for k,v in Counter([x.directory for x in alldocs]).items() if v > 1000}.keys())
+    # alldocs = [x for x in alldocs if x.directory in valid_dirs]
+    #TODO remove
 
     train_docs = [doc for doc in alldocs if doc.split == 'train']
     test_docs = [doc for doc in alldocs if doc.split == 'test']
@@ -196,6 +195,7 @@ import datetime
 infer = False
 def train_pvdm():
     print("training pvdm with: ", hyper_params)
+
     def eval_error(name, infer):
         eval_duration = ''
         with elapsed_timer() as eval_elapsed:
@@ -203,6 +203,7 @@ def train_pvdm():
             eval_duration = '%.1f' % eval_elapsed()
         best_indicator = ' '
         if err < best_error[name]:
+            pv_dm.save(save_filename+'_model_best.pkl')
             best_error[name] = err
             best_indicator = '*'
         all_errors[name].append(err)
@@ -215,6 +216,8 @@ def train_pvdm():
     name = "pvdm"
 
     start_time = datetime.datetime.now()
+    save_filename = 'tmp/%s_%s'%(hyper_params['dataset'], start_time.isoformat())
+
     for epoch in range(passes):
         shuffle(doc_list)  # Shuffling gets best results
 
@@ -238,13 +241,19 @@ def train_pvdm():
     end_time = datetime.datetime.now()
 
 
-    with open('tmp/%s_%s'%(hyper_params['dataset'], start_time), 'a') as f:
-        print({'hyper_params': hyper_params,
-               'start_time': start_time,
-               'end_time': end_time,
-               'duration': end_time-start_time,
-               'best_error': dict(best_error),
-               'all_errors': dict(all_errors)}, file=f)
+    # Write state
+
+    with open(save_filename+'.json', 'a') as f:
+        print(json.dumps({
+            'hyper_params': hyper_params,
+            'start_time': start_time,
+            'end_time': end_time,
+            'duration': (end_time-start_time),
+            'best_error': dict(best_error),
+            'all_errors': dict(all_errors),
+            }, cls=DateTimeAwareJSONEncoder), file=f)
+
+    pv_dm.save(save_filename+'_model_final.pkl')
 
     print("Best error: ", dict(best_error))
     print("Duration %s" % (end_time-start_time))
