@@ -26,18 +26,11 @@ scores = tfs['T'] / (tfs['T'] + tfs['F'])
 tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
 tfs
 
-train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, scores, test_size=0.5, random_state=1 )
+train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, scores, test_size=0.15, random_state=1 )
 
 #alphas = []
 #alpha_error = []
 #for a in np.arange(0, .2, 0.001):
-
-
-# regr = linear_model.Ridge(alpha=0.001)
-# regr.fit(train_vectors, train_scores)
-
-sm_regr = sm.genmod.generalized_linear_model.GLM(train_scores, train_vectors, family=sm.genmod.families.family.Binomial())
-sm_res = sm_regr.fit_regularized(alpha=0.)
 
 # sm_regr = sm.discrete.discrete_model.Logit(train_scores-0.0001, train_vectors)
 # sm_regr.fit(cov_type='HC0')
@@ -48,21 +41,32 @@ sm_res = sm_regr.fit_regularized(alpha=0.)
 #plt.plot(alphas, alpha_error)
 #plt.show()
 
-# Make predictions using the testing set
+# Ridge + Regularization
+sm_res = regr = linear_model.Ridge(alpha=0.001)
+regr.fit(train_vectors, train_scores)
 
-print("train: ", mean_squared_error(train_scores, sm_res.predict(train_vectors)))
-print("test:  ", mean_squared_error(test_scores, sm_res.predict(test_vectors)))
+# GLM - Binomial/Logit
+# sm_regr = sm.genmod.generalized_linear_model.GLM(train_scores, train_vectors, family=sm.genmod.families.family.Binomial(link=sm.genmod.families.links.logit))
+# sm_res = sm_regr.fit_regularized(alpha=0.0000001)
+
+# Lasso + Regularization
+# sm_res = regr = linear_model.Lasso(alpha=0)
+# regr.fit(train_vectors, train_scores)
+
+train_predicted = np.minimum(1, sm_res.predict(train_vectors))
+test_predicted  = np.minimum(1, sm_res.predict(test_vectors))
+
+print("train: ", mean_squared_error(train_scores, train_predicted))
+print("test: ", mean_squared_error(test_scores, test_predicted))
 
 predicted_confusion = pd.concat([
-    pd.DataFrame.from_records({"observed": train_scores, "predicted": sm_res.predict(train_vectors), "inferred": False}),
-#    pd.DataFrame.from_records({"observed": test_scores, "predicted": sm_res.predict(test_vectors), "inferred": True})
+    pd.DataFrame.from_records({"observed": train_scores, "predicted": train_predicted, "inferred": False}),
+    pd.DataFrame.from_records({"observed": test_scores, "predicted": test_predicted, "inferred": True})
     ])
-
-np.corrcoef(train_scores, sm_res.predict(train_vectors))
-np.corrcoef(train_scores, sm_res.predict(train_vectors))
-
-0.267**0.5
 
 ggplot(aes(x='observed', y='predicted', color='inferred'), data=predicted_confusion) +\
     geom_point() +\
     scale_color_brewer(type='qual', palette=2)
+
+np.corrcoef(train_scores, sm_res.predict(train_vectors))[0][1]
+np.corrcoef(test_scores, sm_res.predict(test_vectors))[0][1]
