@@ -20,18 +20,24 @@ vectors = [pv_dm.infer_vector(tokenize_source(source), steps=3, alpha=0.1) for s
 tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
 scores = tfs['T'] / (tfs['T'] + tfs['F'])
 
-regr = linear_model.LinearRegression()
+test_scores = []
+for a in np.arange(0, 20, 0.2):
+    regr = linear_model.Ridge(alpha=7)
 
-train_vectors = vectors[::2]
-test_vectors = vectors[1::2]
-#train_vectors[0][0]
+    train_vectors = vectors[::2]
+    test_vectors = vectors[1::2]
+    #train_vectors[0][0]
 
-train_scores = scores[::2]
-test_scores = scores[1::2]
+    train_scores = scores[::2]
+    test_scores = scores[1::2]
 
-# Train the model using the training sets
-regr.fit(train_vectors, train_scores)
+    # Train the model using the training sets
+    regr.fit(train_vectors, train_scores)
+
+    test_scores.add(mean_squared_error(test_scores, regr.predict(test_vectors)))
+
+plt.plot(test_scores)
 
 # Make predictions using the testing set
-mean_squared_error(train_scores, regr.predict(train_vectors))
-mean_squared_error(test_scores, regr.predict(test_vectors))
+print("train: ", mean_squared_error(train_scores, regr.predict(train_vectors)))
+print("test:  ", mean_squared_error(test_scores, regr.predict(test_vectors)))

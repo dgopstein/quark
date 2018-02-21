@@ -245,7 +245,7 @@ def train_pvdm():
     print("Best error: ", dict(best_error))
     print("Duration %s" % (end_time-start_time))
 
-if __name__== "__main__":
+def main():
     alldocs, train_docs, test_docs = load_docs()
     doc_list = alldocs[:]  # For reshuffling per pass
 
