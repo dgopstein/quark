@@ -97,21 +97,8 @@ def load_docs():
 
     return (alldocs, train_docs, test_docs)
 
-alldocs, train_docs, test_docs = load_docs()
-doc_list = alldocs[:]  # For reshuffling per pass
-
-id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
-len(id2class)
-###################################################
-# Create the models
-###################################################
 
 assert gensim.models.doc2vec.FAST_VERSION > -1, "This will be painfully slow otherwise"
-
-# PV-DM w/ average - alternatives include using dm_concat and using PV-DBOW
-pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=hyper_params['window'], negative=hyper_params['negative_samples'], hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
-
-pv_dm.build_vocab(alldocs)
 
 ###################################################
 # Evaluate the models
@@ -258,11 +245,22 @@ def train_pvdm():
     print("Best error: ", dict(best_error))
     print("Duration %s" % (end_time-start_time))
 
-train_pvdm()
+if __name__== "__main__":
+    alldocs, train_docs, test_docs = load_docs()
+    doc_list = alldocs[:]  # For reshuffling per pass
 
-pv_dm.most_similar("int")
-pv_dm.wv.most_similar(positive=['int', 'int'], negative=['0'])
-len(pv_dm.wv.vocab.keys())
+    id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
+    len(id2class)
+
+    pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=hyper_params['window'], negative=hyper_params['negative_samples'], hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
+
+    pv_dm.build_vocab(alldocs)
+
+    train_pvdm()
+
+    pv_dm.most_similar("int")
+    pv_dm.wv.most_similar(positive=['int', 'int'], negative=['0'])
+    len(pv_dm.wv.vocab.keys())
 
 #import gnuplotlib as gp
 #gp.plot( [1, 2, 3, 2, 1] )
