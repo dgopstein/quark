@@ -13,7 +13,7 @@ sources = ["int main() {\n  int x = 2; x += 3; }", "int main() {\n  int x = 4; x
 
 vectors = [pv_dm.infer_vector(tokenize_source(source), steps=3, alpha=0.1) for source in sources]
 
-snippet_results = pandas.read_csv('results_normalized.csv')
+snippet_results = pandas.read_csv('tmp/results_normalized.csv')
 
 snippet_results.columns
 
