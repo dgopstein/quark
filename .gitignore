@@ -1,5 +1,9 @@
-.*
 !.gitignore
+.*
+
 *~
-tmp/
+
 __pycache__/
+
+tmp/
+img/
