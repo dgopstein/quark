@@ -1,5 +1,16 @@
 # https://github.com/RaRe-Technologies/gensim/blob/develop/docs/notebooks/doc2vec-IMDB.ipynb
 
+low_dim_linux_hyper_params = {
+    'dataset': 'linux',
+    'test_split': 4,
+    'vector_size': 50,
+    'window': 10,
+    'negative_samples': 5,
+    'min_count': 1000,
+    'alpha_start': 0.1,
+    'alpha_stop': 0.001,
+    'passes': 5}
+
 best_linux_hyper_params = {
     'dataset': 'linux',
     'test_split': 4,
@@ -33,7 +44,7 @@ best_mongo_hyper_params = {
     'alpha_stop': 0.001,
     'passes': 5}
 
-hyper_params = best_linux_hyper_params
+hyper_params = low_dim_linux_hyper_params
 
 datasets = {
     'linux': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/linux"]),
