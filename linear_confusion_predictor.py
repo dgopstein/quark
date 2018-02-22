@@ -5,6 +5,7 @@ from ggplot import *
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn as skl
+from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from gensim.models import Doc2Vec
@@ -12,21 +13,24 @@ from gensim_doc2vec import tokenize_source
 
 import pandas as pd
 
-pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T15:57:56.584064_model_best.pkl')
+#pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T23:25:02.016544_model_final.pkl') # 50dim
+pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T23:34:44.493096_model_final.pkl') # 30dim
 
 snippet_results = pd.read_csv('tmp/results_normalized.csv')
 snippet_questions = pd.read_csv('tmp/questions.csv')
 
+context_results = pd.read_csv('tmp/context_study_usercode.csv')
+context_questions = pd.read_csv('tmp/context_study_code.csv')
+
+#combined_results
+
 vectors = [pv_dm.infer_vector(tokenize_source(source), steps=3, alpha=0.1) for source in snippet_questions['Code']]
 #vectors[0][0]
 
-tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
-scores = tfs['T'] / (tfs['T'] + tfs['F'])
+snippet_tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
+snippet_scores = snippet_tfs['T'] / (snippet_tfs['T'] + snippet_tfs['F'])
 
-tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
-tfs
-
-train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, scores, test_size=0.15, random_state=2 )
+train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, snippet_scores, test_size=0.15, random_state=2 )
 
 #alphas = []
 #alpha_error = []
@@ -46,11 +50,12 @@ train_vectors, test_vectors, train_scores, test_scores = train_test_split(vector
 # sm_res = sm_regr.fit_regularized(alpha=0.0000001)
 
 # Lasso + Regularization
-# sm_res = regr = skl.linear_model.Lasso(alpha=0)
+# sm_res = regr = linear_model.Lasso(alpha=0.0001)
 # regr.fit(train_vectors, train_scores)
 
 # Ridge + Regularization
-sm_res = regr = skl.linear_model.Ridge(alpha=20000)
+#sm_res = regr = linear_model.Ridge(alpha=1) # 50dim
+sm_res = regr = linear_model.Ridge(alpha=.1) # 30dim
 regr.fit(train_vectors, train_scores)
 
 train_predicted = np.minimum(10, sm_res.predict(train_vectors))
@@ -65,6 +70,7 @@ predicted_confusion = pd.concat([
     ])
 
 ggplot(aes(x='observed', y='predicted', color='inferred'), data=predicted_confusion) +\
-    geom_point() +\
-    scale_color_brewer(type='qual', palette=2)
+    geom_point(size=40) +\
+    xlim(0,1) + ylim(0,1) +\
+    scale_color_manual(values=['blue', 'red'])
 
