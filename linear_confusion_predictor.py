@@ -19,18 +19,29 @@ pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T23:34:44.493096_model_final.pkl') # 3
 snippet_results = pd.read_csv('tmp/results_normalized.csv')
 snippet_questions = pd.read_csv('tmp/questions.csv')
 
+snippet_questions['ID'] = 's' + snippet_questions['ID'].astype('str')
+snippet_results['CodeID'] = 's' + snippet_results['CodeID'].astype('str')
+
 context_results = pd.read_csv('tmp/context_study_usercode.csv')
 context_questions = pd.read_csv('tmp/context_study_code.csv')
 
-#combined_results
+context_questions['ID'] = 'c' + context_questions['ID'].astype('str')
+context_results['CodeID'] = 'c' + context_results['CodeID'].astype('str')
 
-vectors = [pv_dm.infer_vector(tokenize_source(source), steps=3, alpha=0.1) for source in snippet_questions['Code']]
+combined_questions = pd.concat([snippet_questions[['ID', 'Code']],
+                                context_questions[['ID', 'Code']]])
+combined_results = pd.concat([snippet_results[['CodeID', 'Correct']],
+                              context_results[['CodeID', 'Correct']]])
+
+combined_tfs = combined_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
+combined_scores = combined_tfs['T'] / (combined_tfs['T'] + combined_tfs['F'])
+
+code_scores = pd.merge(combined_questions, combined_scores.to_frame('Score'), left_on="ID", right_index=True)
+
+vectors = [pv_dm.infer_vector(tokenize_source(source), steps=3, alpha=0.1) for source in code_scores['Code']]
 #vectors[0][0]
 
-snippet_tfs = snippet_results.groupby('CodeID')['Correct'].value_counts().unstack().fillna(0)
-snippet_scores = snippet_tfs['T'] / (snippet_tfs['T'] + snippet_tfs['F'])
-
-train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, snippet_scores, test_size=0.15, random_state=2 )
+train_vectors, test_vectors, train_scores, test_scores = train_test_split(vectors, code_scores['Score'], test_size=0.15, random_state=2 )
 
 #alphas = []
 #alpha_error = []
@@ -55,7 +66,7 @@ train_vectors, test_vectors, train_scores, test_scores = train_test_split(vector
 
 # Ridge + Regularization
 #sm_res = regr = linear_model.Ridge(alpha=1) # 50dim
-sm_res = regr = linear_model.Ridge(alpha=.1) # 30dim
+sm_res = regr = linear_model.Ridge(alpha=0.1) # 30dim
 regr.fit(train_vectors, train_scores)
 
 train_predicted = np.minimum(10, sm_res.predict(train_vectors))
@@ -73,4 +84,3 @@ ggplot(aes(x='observed', y='predicted', color='inferred'), data=predicted_confus
     geom_point(size=40) +\
     xlim(0,1) + ylim(0,1) +\
     scale_color_manual(values=['blue', 'red'])
-
