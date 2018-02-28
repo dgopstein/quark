@@ -1,9 +1,22 @@
 # https://github.com/RaRe-Technologies/gensim/blob/develop/docs/notebooks/doc2vec-IMDB.ipynb
 
+linux_edn_hyper_params = {
+    'dataset': 'linux-edn',
+    'source_encoding': 'edn',
+    'test_split': 4,
+    'vector_size': 30,
+    'window': 10,
+    'negative_samples': 5,
+    'min_count': 1000,
+    'alpha_start': 0.1,
+    'alpha_stop': 0.001,
+    'passes': 5}
+
 low_dim_linux_hyper_params = {
     'dataset': 'linux',
+    'source_encoding': 'code',
     'test_split': 4,
-    'vector_size': 50,
+    'vector_size': 30,
     'window': 10,
     'negative_samples': 5,
     'min_count': 1000,
@@ -11,42 +24,11 @@ low_dim_linux_hyper_params = {
     'alpha_stop': 0.001,
     'passes': 5}
 
-best_linux_hyper_params = {
-    'dataset': 'linux',
-    'test_split': 4,
-    'vector_size': 100,
-    'window': 10,
-    'negative_samples': 5,
-    'min_count': 1000,
-    'alpha_start': 0.1,
-    'alpha_stop': 0.001,
-    'passes': 5}
-
-best_nginx_hyper_params = {
-    'dataset': 'nginx',
-    'test_split': 4,
-    'vector_size': 100,
-    'window': 10,
-    'negative_samples': 5,
-    'min_count': 5,
-    'alpha_start': 0.01,
-    'alpha_stop': 0.001,
-    'passes': 20}
-
-best_mongo_hyper_params = {
-    'dataset': 'nginx',
-    'test_split': 4,
-    'vector_size': 100,
-    'window': 10,
-    'negative_samples': 5,
-    'min_count': 5,
-    'alpha_start': 0.01,
-    'alpha_stop': 0.001,
-    'passes': 5}
-
-hyper_params = low_dim_linux_hyper_params
+hyper_params = linux_edn_hyper_params
 
 datasets = {
+    'linux-edn': {'file_finder': lambda: filetypes_in_dirs(['edn'], ["~/quark/tmp/linux-edn"]),
+              'module_matcher': r'.*?/linux-edn/([^/]*).*'},
     'linux': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/linux"]),
               'module_matcher': r'.*?/linux/([^/]*).*'},
     'mongo': {'file_finder': lambda: c_files_in_dirs(["~/opt/src/mongo/src/mongo"]),
@@ -74,21 +56,27 @@ import re
 from scipy import stats
 stats.chisqprob = lambda chisq, df: stats.chi2.sf(chisq, df)
 
-def tokenize_source(s):
+def tokenize_code(s):
     token_pat = '(?:[][.,;{}()|+=*&^%!~-]|(?:\s+))'
     return re.findall(re.compile(token_pat + '|(?:(?!' + token_pat + ').)+'), s)
+
+def tokenize_edn(s):
+    return list(filter(lambda x: not x.isspace(), tokenize_source(s)))
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
 
 def load_docs():
     files = datasets[hyper_params['dataset']]['file_finder']()
+    tokenize = {"code": tokenize_source,
+                "edn": tokenize_edn}[hyper_params["source_encoding"]]
+
     doc_idx = 0
     alldocs = []
     #[x for x in files if re.match(r'.*/linux/.*/linux/', x)][:3]
     for filename in files: #[:100]:
         with open(filename, 'r') as file_obj:
             try:
-                file_content = tokenize_source(file_obj.read())
+                file_content = tokenize(file_obj.read())
                 #split = ['train', 'test', 'validate', 'extra'][doc_idx % 4]
                 split = ['test', 'train'][doc_idx % hyper_params['test_split'] == 0]
                 tags = [filename]
@@ -261,17 +249,18 @@ def main():
     doc_list = alldocs[:]  # For reshuffling per pass
 
     id2class = sorted(list(Counter([x.directory for x in train_docs]).keys()))
-    len(id2class)
+    print(len(id2class))
 
     pv_dm = Doc2Vec(dm=1, dm_mean=1, vector_size=hyper_params['vector_size'], window=hyper_params['window'], negative=hyper_params['negative_samples'], hs=0, min_count=hyper_params['vector_size'], workers=multiprocessing.cpu_count())
 
     pv_dm.build_vocab(alldocs)
 
+    print(len(pv_dm.wv.vocab.keys()))
+
     train_pvdm()
 
     pv_dm.most_similar("int")
     pv_dm.wv.most_similar(positive=['int', 'int'], negative=['0'])
-    len(pv_dm.wv.vocab.keys())
 
 #import gnuplotlib as gp
 #gp.plot( [1, 2, 3, 2, 1] )
