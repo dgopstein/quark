@@ -61,7 +61,7 @@ def tokenize_code(s):
     return re.findall(re.compile(token_pat + '|(?:(?!' + token_pat + ').)+'), s)
 
 def tokenize_edn(s):
-    return list(filter(lambda x: not x.isspace(), tokenize_source(s)))
+    return list(filter(lambda x: not x.isspace(), tokenize_code(s)))
 
 CodeDocument = namedtuple('CodeDocument', 'words split tags directory')
 
