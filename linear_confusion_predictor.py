@@ -14,11 +14,11 @@ from gensim_doc2vec import tokenize_code, tokenize_edn
 
 import pandas as pd
 
-pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T23:34:44.493096_model_final.pkl') # 30dim
-tokenize = tokenize_code
+#pv_dm = Doc2Vec.load('tmp/linux_2018-02-21T23:34:44.493096_model_final.pkl') # 30dim
+#tokenize = tokenize_code
 
-#pv_dm = Doc2Vec.load('tmp/linux-edn_2018-02-28T14:45:06.776662_model_final.pkl')
-#tokenize = tokenize_edn
+pv_dm = Doc2Vec.load('tmp/linux-edn_2018-02-28T14:45:06.776662_model_final.pkl')
+tokenize = tokenize_edn
 
 snippet_results = pd.read_csv('tmp/results_normalized.csv')
 snippet_questions = pd.read_csv('tmp/questions.csv.edn')
@@ -47,27 +47,28 @@ code_scores = pd.merge(combined_questions, combined_scores.to_frame('Score'), le
 vectors = [pv_dm.infer_vector(tokenize(source), steps=3, alpha=0.1) for source in code_scores['Code']]
 
 # Tell the regression whether the code is C/NC - TODO REMOVE
-# vectors = [np.append(v, t) for (v, t) in zip(vectors, code_scores['Type'].map({'NC':0, 'C':1}))]
+#vectors = [np.append(v, t) for (v, t) in zip(vectors, code_scores['Score'])]
+#vectors = [np.append(v, t) for (v, t) in zip(vectors, code_scores['Type'].map({'NC':0,'C':1}))]
 
 X = vectors
 y = code_scores['Score']
 
 #regr = linear_model.LinearRegression()
-#regr = linear_model.Lasso(alpha=0.0001)
+#regr = linear_model.Lasso()
 regr = linear_model.Ridge()
 #print(regr.intercept_)
 #print(regr.coef_)
 
 scorer = 'neg_mean_absolute_error'
+#scorer = 'r2'
 gscv = GridSearchCV(estimator=regr, param_grid=dict(alpha=np.logspace(-6, 3, 10)), n_jobs=-1, scoring=scorer)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)#, random_state=2 )
 gscv.fit(X_train, y_train)
+gscv.best_estimator_
+print("gscv.best_score: ", gscv.best_score_)
 regr = gscv.best_estimator_
-regr
-gscv.best_score_
 
 print("score:  ", np.mean(cross_val_score(regr, X, y, cv=10, scoring=scorer)))
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)#, random_state=2 )
 
 predictor = regr.fit(X_train, y_train)
 y_train_predicted = predictor.predict(X_train)
