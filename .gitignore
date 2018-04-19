@@ -3,6 +3,8 @@
 
 *~
 
+*.class
+
 __pycache__/
 
 tmp/
